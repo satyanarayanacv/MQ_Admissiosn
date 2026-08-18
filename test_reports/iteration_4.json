@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 4 covered the new JWT + RBAC layer end-to-end. Backend: 28/28 pytest cases passed (auth login by username & email, /auth/me guard, admin-only staff/course endpoints, role-restricted applicant writes, dashboard/applicants/reports/courses reads, course CRUD with 409 duplicate, staff CRUD with self-delete 400, applicant create/stage/documents/payments including overpayment 400 and invalid stage 400). Frontend (390x844 mobile): login via demo buttons for all 4 roles, tab navigation via tab-* testIDs, admin sees Overview FAB + add-course + add-staff, reviewer & lecturer hide FAB + course/staff admin controls, office keeps FAB, reviewer settings correctly hides the Staff members section, Reports tab renders share button + course/quota/fees text. One 401 console warning appears immediately after role switching (stale React Query with old token) - benign because auth refresh clears it.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "expo-router Tabs / login.tsx", "issue": "Deprecation warnings in console: 'shadow*' style props are deprecated (use boxShadow) and 'props.pointerEvents is deprecated (use style.pointerEvents)'. Not blocking but should be migrated in a future pass. Reference: frontend uses shadowColor/shadowOffset/... in src/theme.ts or component styles."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auth_rbac_iteration4.py",
+    "/app/test_reports/pytest/iteration4.xml"
+  ],
+  "action_items": [
+    "Optional: eagerly clear cached React Query state on sign-out to avoid the transient 401 console warning right after switching roles (invalidate/clear queries in signOut).",
+    "Consider migrating deprecated RN Web style props (shadow*, props.pointerEvents) to their modern equivalents to silence dev-only warnings."
+  ],
+  "critical_code_review_comments": [
+    "server.py stores plaintext seed passwords in defaults (Review@123456 etc.) - fine for demo but should be gated behind an env flag before real deployment.",
+    "backend/.env dependence on EXPO_PUBLIC_BACKEND_URL only; system prompt lists EXPO_BACKEND_URL as the contract - already flagged in iteration 3 and still unresolved.",
+    "All async DB access uses motor properly; MongoDB _id excluded via clean() and projection - no serialization issues found."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auth_rbac_iteration4.py",
+    "/app/test_reports/pytest/iteration4.xml",
+    "/app/test_reports/iteration_4.json"
+  ],
+  "success_rate": {"backend": "100% (28/28)", "frontend": "100% on the flows exercised (login, RBAC gating on Overview + Settings + Reports for all 4 roles, tab navigation, Applications search + filter chips)"},
+  "seed_data_creation": "Test run created transient course TSTxxxx (deleted at end), staff tstaffXXXXXX (deleted), applicant APP-TEST-XXXXX (retained - safe test data prefix). Existing seeded users (admin/reviewer/lecturer/office) and courses (BTCS/BCOM/BBA/BAECO) reused.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Public preview: https://mvp-to-app-2.preview.emergentagent.com. Auth is OAuth2 form (application/x-www-form-urlencoded) at POST /api/auth/login with field name 'username' (accepts username OR email). Bearer token in Authorization header. Tab testIDs: tab-overview, tab-applications, tab-reports, tab-settings. Demo login testIDs: demo-login-{admin|reviewer|lecturer|office} - these auto-submit. Admin-only admin controls: add-course-button, add-staff-button. Overview FAB testID: new-applicant-fab (admin+office only). To sign out use settings-signout-button. Reports section testIDs: reports-scroll, share-report-button. For deep applicant detail flows, note that 'text=\"Aarav\"' as a strict Playwright locator will NOT match 'Aarav Mehta' - use get_by_text('Aarav', exact=False) or a partial CSS selector instead.",
+  "rca_of_issue": "No new bugs. Only one initial pytest failure (TestStaff.test_create_duplicate_and_delete returned 422) was caused by using '@t.local' domain which Pydantic EmailStr rejects; changed to '@example.com' and it passes. This was a test-harness issue, not a product bug."
+}

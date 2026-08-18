@@ -1,47 +1,56 @@
-# Admissions Management — Product Record
+# Admissions Management — Product Requirements Document
 
-## Problem statement
-Using the supplied Admission Management MVP file, build a complete mobile admissions application.
+## Original Problem Statement
+Migrate a PHP/MySQL admissions MVP to an Expo (React Native) + FastAPI + MongoDB mobile app.
+Implement admissions workflows (dashboard, queue, applicant detail, review stages, document
+checklist, fee tracking) and expand with secure staff access, course setup, document review,
+and reports. Finally, package the code into a downloadable ZIP.
 
 ## Architecture
-- Expo SDK 54 mobile client with Expo Router, React Native components, safe-area layouts, and Material Community/Ionicons.
-- FastAPI service on `/api` with MongoDB persistence through Motor.
-- Applicant documents model admissions intake, CQ/MQ quota, CQ phases, review stages, fee position, activity history, and checklist state.
+- **Frontend**: Expo Router (file-based), tab navigation, JWT auth context, Toast provider.
+  - `app/_layout.tsx` — AuthProvider + ToastProvider + auth gate (redirects login ↔ (app))
+  - `app/login.tsx` — staff login with demo-account quick sign-in
+  - `app/(app)/` — tab group: `index` (Overview), `applications`, `reports`, `settings`
+  - `src/` — `api.ts` (fetch client + Bearer), `context/auth.tsx`, `context/toast.tsx`,
+    `components/common.tsx`, `components/modals.tsx`, `theme.ts`, `types.ts`
+- **Backend**: FastAPI + Motor (async MongoDB), JWT (PyJWT) + bcrypt, role-based access.
+  - Routes prefixed `/api`; ObjectId `_id` never serialized.
+- **Auth**: JWT username/email + password. Roles: `admin`, `reviewer`, `lecturer`, `office`.
+  Accounts seeded idempotently on startup.
 
-## User personas
-- Admissions officer: finds applications, checks documents, advances review stages.
-- Reviewer: opens applicant detail, reviews evidence, and records decisions.
-- Program administrator: monitors admissions volume, quota mix, pending documents, and collected fees.
+## User Personas
+- **Admin (Registrar)**: full control — applicants, courses, staff, reports.
+- **Reviewer / Lecturer**: review applications, move stages, verify documents, read reports.
+- **Office**: intake — create applicants, update documents, record fee payments.
 
-## Core requirements (static)
-- Dashboard with applications, admitted, document-pending, and fee metrics.
-- Searchable/filterable applicant queue.
-- Applicant detail with stage workflow, document checklist, fee position, and activity.
-- Create applicant/application record.
-- Persist stage, document, and payment changes.
-- Reject duplicate application numbers, invalid documents, and overpayments.
-- Mobile-first responsive layout with accessible 44px touch targets and stable test IDs.
+## Core Requirements (static)
+- Secure staff login with role-based permissions.
+- Applicant lifecycle: New → Documents → Under review → Admitted.
+- Document checklist per applicant; fee tracking with payments.
+- Course catalog setup (CRUD).
+- Reports: pipeline by stage, by course, by quota, fee collection + shareable summary.
 
-## Implemented
-- 2026-08-18: Replaced starter image screen with the Admissions overview and queue shell.
-- 2026-08-18: Added live FastAPI/MongoDB dashboard, applicant list/search, applicant creation, stage updates, document updates, and payment endpoint.
-- 2026-08-18: Added seeded first-run operational records so the dashboard has an immediately usable admissions queue.
-- 2026-08-18: Added warm Swiss visual system, detail modal, wrapped mobile stage controls, checklist feedback, fee progress, pull-to-refresh, and create form.
-- 2026-08-18: Verified backend with curl and full Expo regression testing at 390x844; no mocked APIs.
+## Implemented (2026-08-18)
+- JWT auth (login/me), bcrypt hashing, idempotent seeding of 4 role accounts.
+- RBAC across all mutating endpoints (verified: 28/28 backend tests pass).
+- Dashboard metrics, applicant queue with search + stage filter, applicant detail
+  (stage change, document toggle, payment recording).
+- Course CRUD (admin), staff CRUD (admin), Reports endpoint with share_text.
+- Full mobile UI: login, Overview, Applications, Reports, Settings tabs; Toast feedback.
+- Downloadable ZIP generated at `/app/admissions-management.zip`.
 
-## Prioritized backlog
-1. Add authenticated role-based staff access and audit logs.
-2. Add course/intake and academic-year administration screens.
-3. Add CQ/MQ transfer history with required reason and permissions.
-4. Add fee receipt history and reporting/export views.
-5. Add document upload/storage with real files and privacy retention controls.
+## Backlog / Remaining
+- **P1**: Edit/delete applicant; generate offer letters (PDF).
+- **P2**: Clear cached state on sign-out to remove transient 401 log; migrate deprecated
+  RN-Web `shadow*` props to `boxShadow`.
+- **P2**: Document upload with Emergent Object Storage (currently checklist toggles only).
 
-## Remaining priorities
-- P0: None for the current admissions queue MVP.
-- P1: Authentication, roles, audit trail, and document uploads.
-- P2: Reports, CSV export, course configuration, and notifications.
+## Test Credentials
+See `/app/memory/test_credentials.md`.
 
-## Next task list
-- Define staff roles and login/session requirements.
-- Add course and intake data management.
-- Replace first-run seed records with institution onboarding/import.
+## Key API Endpoints
+- POST `/api/auth/login`, GET `/api/auth/me`
+- GET `/api/dashboard`, GET/POST `/api/applicants`, PATCH stage/documents, POST payments
+- GET/POST/PATCH/DELETE `/api/courses`
+- GET/POST/DELETE `/api/staff`
+- GET `/api/reports`

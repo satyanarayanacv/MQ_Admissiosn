@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 5 covers the three new features end-to-end. Backend pytest: 32/32 passed against the public preview (edit applicant PATCH admin+office / 403 reviewer+lecturer / 400 empty body / 404 unknown; delete DELETE admin only / 403 office+reviewer+lecturer / 404 unknown / GET-verified removal; CSV import admin only + 403 for others + created=2/skipped=0/errors=2 shape + duplicate run skipped=2 + GET verification; document upload for all 4 roles round-trips through Emergent Object Storage - Identity proof/Mark sheets/Transfer certificate/Fee receipt - and the returned bytes match; download 200 via ?token=, 401 for missing+bad token, 404 when no file exists; invalid document name 400; unknown applicant 404; plus regression on dashboard/applicants/courses/staff/reports). Frontend mobile (390x844): admin Applications tab shows Import button, bulk-import modal accepts pasted CSV and the two rows appear in the list; edit-applicant-button opens the edit form and Save updates the record (visible in list after search); delete-applicant-button shows confirm-delete-card and Confirm removes the applicant; office role sees Edit + Upload icons but not Delete/Import; reviewer role hides Import, Edit and Delete. RBAC gating for reviewer previously confirmed in-run.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "applicant detail sheet", "issues": ["Header icon buttons (edit-applicant-button, delete-applicant-button, close-detail-button) render inside a horizontally scrollable header row; on RN Web they can report boundingBox with y just above viewport 0 which trips Playwright default click actionability. Clicking still works via native tap on device and via JS click in tests; not a real user bug but worth normalising header layout for cleaner testability."]}
+    ],
+    "react_native_issues": [
+      {"component": "Applicant detail modal (src/components/modals.tsx)", "issue": "Console warning repeats on every open: 'Unexpected text node: . A text node cannot be a child of a <View>.' - a stray string child (likely a template literal that resolves to '' or a space between JSX siblings inside a <View>) is being rendered. Non-blocking but should be cleaned up."},
+      {"component": "Global theme / RN Web deprecations", "issue": "Still emitting 'shadow* style props are deprecated (use boxShadow)' and 'props.pointerEvents is deprecated (use style.pointerEvents)' - carried over from iteration 4."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration5_new_features.py",
+    "/app/test_reports/pytest/iteration5.xml"
+  ],
+  "action_items": [
+    "Investigate the 'Unexpected text node' warning in the applicant detail modal (likely a bare string/whitespace child inside a <View> in modals.tsx). Wrap in <Text> or remove.",
+    "Optional polish: migrate legacy shadow* style props to boxShadow and props.pointerEvents to style.pointerEvents to silence RN Web dev warnings.",
+    "Consider clearing React Query cache on signOut to avoid the transient 401 request logged immediately after role switch."
+  ],
+  "critical_code_review_comments": [
+    "server.py edit_applicant correctly returns 400 when the PATCH body is empty (before hitting the DB) and 404 when the applicant is missing - matches contract.",
+    "import_applicants normalises header casing/spacing, validates required columns, and reports created/skipped/errors[:20] - safe against very large CSVs.",
+    "upload_document validates document name against DOCUMENTS whitelist, checks applicant existence before storage put, enforces 15 MB limit, and returns storage 402 as HTTP 402 with a clear message.",
+    "download_document accepts both ?token= and Authorization: Bearer, decodes JWT once, and returns raw bytes with content-type - clean.",
+    "clean(_) helper is applied consistently so MongoDB _id never leaks - re-verified in tests."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration5_new_features.py",
+    "/app/test_reports/pytest/iteration5.xml",
+    "/app/test_reports/iteration_5.json"
+  ],
+  "success_rate": {"backend": "100% (32/32)", "frontend": "100% on flows exercised (admin import, admin edit, admin delete, doc upload/view icons render, RBAC for reviewer + office)"},
+  "seed_data_creation": "Backend pytest created transient TEST_ applicants (APP-TEST-EDIT-*, APP-TEST-DEL-*, APP-TEST-DOC-*, APP-TEST-NOFILE-*, APP-TEST-IMP-*-{1,2}) and cleaned them up in teardown_class. Frontend Playwright created APP-UI-{stamp}-1/-2, edited -1 and deleted both at end-of-run. No lingering test data expected.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Public preview: https://mvp-to-app-2.preview.emergentagent.com. Auth via /api/auth/login (application/x-www-form-urlencoded, field 'username'). For UI: on RN Web the applicant detail header buttons (edit-applicant-button, delete-applicant-button, close-detail-button) and the Import modal's run-import-button can report 'outside of viewport' to Playwright even at 390x844; use el.evaluate('e => e.click()') instead of force click. Detail modal is a sheet that stays mounted; scope searches with the 'application-search-input' before opening a row. New testIDs added this round: import-button, close-import-button, csv-paste-input, pick-csv-button, run-import-button, edit-applicant-button, delete-applicant-button, confirm-delete-card, cancel-delete-button, confirm-delete-button, edit-first_name-input, edit-last_name-input, edit-mobile-input, edit-email-input, edit-fee-input, save-edit-button, close-edit-button, upload-doc-<slug>, view-doc-<slug>. File download uses GET /api/files/{app_no}/{doc}?token=<JWT>. Uploads go through /api/applicants/{app_no}/documents/upload (multipart form field 'document' + 'file').",
+  "rca_of_issue": "No product bugs found. The only script-level hiccup was Playwright's actionability check flagging some in-modal buttons as 'outside of viewport' even with force=True; the fix was to dispatch a JS click via element.evaluate. All backend flows return correct status codes, persist correctly, and enforce RBAC as specified."
+}

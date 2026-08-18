@@ -32,11 +32,16 @@ and reports. Finally, package the code into a downloadable ZIP.
 
 ## Implemented (2026-08-18)
 - JWT auth (login/me), bcrypt hashing, idempotent seeding of 4 role accounts.
-- RBAC across all mutating endpoints (verified: 28/28 backend tests pass).
+- RBAC across all mutating endpoints.
 - Dashboard metrics, applicant queue with search + stage filter, applicant detail
   (stage change, document toggle, payment recording).
 - Course CRUD (admin), staff CRUD (admin), Reports endpoint with share_text.
 - Full mobile UI: login, Overview, Applications, Reports, Settings tabs; Toast feedback.
+- **Applicant editing** (admin+office PATCH) and **delete** (admin, with confirm).
+- **Document file uploads** per checklist item via Emergent Managed Object Storage,
+  with authenticated view/download (`/api/files/...?token=`).
+- **Bulk CSV import** of applicants (admin) — pick file or paste rows.
+- Verified: 32/32 backend tests pass; frontend flows + RBAC verified.
 - Downloadable ZIP generated at `/app/admissions-management.zip`.
 
 ## Backlog / Remaining

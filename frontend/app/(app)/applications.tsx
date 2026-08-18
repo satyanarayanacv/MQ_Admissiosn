@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { api } from "@/src/api";
 import { ApplicantRow, EmptyState } from "@/src/components/common";
-import { ApplicantDetailModal, NewApplicantModal } from "@/src/components/modals";
+import { ApplicantDetailModal, ImportModal, NewApplicantModal } from "@/src/components/modals";
 import { useAuth } from "@/src/context/auth";
 import { useToast } from "@/src/context/toast";
 import { COLORS } from "@/src/theme";
@@ -23,6 +23,7 @@ export default function Applications() {
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<Applicant | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -49,11 +50,20 @@ export default function Applications() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const canCreate = can("admin", "office");
+  const isAdmin = can("admin");
 
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <View style={s.head}>
-        <Text style={s.pageTitle}>Application queue</Text>
+        <View style={s.titleRow}>
+          <Text style={s.pageTitle}>Application queue</Text>
+          {isAdmin && (
+            <Pressable testID="import-button" onPress={() => setShowImport(true)} style={s.importBtn}>
+              <Ionicons name="cloud-upload-outline" size={17} color={COLORS.navy} />
+              <Text style={s.importText}>Import</Text>
+            </Pressable>
+          )}
+        </View>
         <View style={s.search}>
           <Ionicons name="search" size={18} color={COLORS.muted} />
           <TextInput
@@ -108,10 +118,15 @@ export default function Applications() {
 
       <ApplicantDetailModal
         applicant={selected}
+        courses={courses}
         onClose={() => setSelected(null)}
         onChanged={(a) => {
           setSelected(a);
           setRows((prev) => prev.map((r) => (r.application_no === a.application_no ? a : r)));
+        }}
+        onDeleted={() => {
+          setSelected(null);
+          load();
         }}
       />
       <NewApplicantModal
@@ -123,6 +138,14 @@ export default function Applications() {
           load();
         }}
       />
+      <ImportModal
+        visible={showImport}
+        onClose={() => setShowImport(false)}
+        onDone={() => {
+          setShowImport(false);
+          load();
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -130,7 +153,10 @@ export default function Applications() {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.paper },
   head: { paddingHorizontal: 22, paddingTop: 10, borderBottomWidth: 1, borderBottomColor: COLORS.line, backgroundColor: COLORS.paper },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   pageTitle: { color: COLORS.ink, fontSize: 26, fontWeight: "800" },
+  importBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: COLORS.line, backgroundColor: COLORS.surface, paddingHorizontal: 12, height: 38 },
+  importText: { color: COLORS.navy, fontWeight: "800", fontSize: 13 },
   search: { marginTop: 14, height: 50, borderWidth: 1, borderColor: COLORS.line, backgroundColor: COLORS.surface, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 6 },
   searchInput: { flex: 1, marginLeft: 6, color: COLORS.ink, fontSize: 15 },
   filterScroll: { marginTop: 12, marginBottom: 12, maxHeight: 56 },

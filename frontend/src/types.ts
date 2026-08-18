@@ -21,6 +21,7 @@ export type Applicant = {
   stage: string;
   score: number;
   documents: Record<string, boolean>;
+  document_files?: Record<string, { path: string; name: string; content_type?: string; uploaded_at?: string }>;
   total_fee: number;
   paid: number;
   activity: string[];

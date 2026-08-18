@@ -119,9 +119,14 @@ export default function Overview() {
 
       <ApplicantDetailModal
         applicant={selected}
+        courses={courses}
         onClose={() => setSelected(null)}
         onChanged={(a) => {
           setSelected(a);
+          load();
+        }}
+        onDeleted={() => {
+          setSelected(null);
           load();
         }}
       />

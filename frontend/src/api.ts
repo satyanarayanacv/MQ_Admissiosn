@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 import { storage } from "@/src/utils/storage";
 
@@ -42,3 +43,28 @@ export const api = {
     return data;
   },
 };
+
+export async function fileUrl(applicationNo: string, document: string): Promise<string> {
+  const token = await storage.secureGet(TOKEN_KEY, "");
+  return `${BASE}/files/${encodeURIComponent(applicationNo)}/${encodeURIComponent(document)}?token=${token}`;
+}
+
+export async function uploadDocument(applicationNo: string, document: string, file: { uri: string; name: string; type: string }) {
+  const token = await storage.secureGet(TOKEN_KEY, "");
+  const form = new FormData();
+  form.append("document", document);
+  if (Platform.OS === "web") {
+    const blob = await (await fetch(file.uri)).blob();
+    form.append("file", blob, file.name);
+  } else {
+    form.append("file", { uri: file.uri, name: file.name, type: file.type } as any);
+  }
+  const res = await fetch(`${BASE}/applicants/${encodeURIComponent(applicationNo)}/documents/upload`, {
+    method: "POST",
+    headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(data?.detail || `Upload failed (${res.status})`, res.status);
+  return data;
+}

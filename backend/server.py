@@ -2,18 +2,23 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Annotated, Any, Optional
+import csv
+import io
 import logging
 import os
+import uuid
 
 import bcrypt
 import jwt
+import requests
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, status
+from fastapi import APIRouter, Depends, FastAPI, File, Form, Header, HTTPException, Query, Response, UploadFile, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from pydantic import BaseModel, EmailStr, Field
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.cors import CORSMiddleware
 
 ROOT_DIR = Path(__file__).parent
@@ -23,6 +28,45 @@ db = client[os.environ["DB_NAME"]]
 app = FastAPI(title="Admissions Management API")
 api = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
+
+# ------------------------------------------------------------------ object storage
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+APP_NAME = "admissions-management"
+_storage_key: Optional[str] = None
+
+
+def init_storage() -> Optional[str]:
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    if not EMERGENT_KEY:
+        return None
+    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+    resp.raise_for_status()
+    _storage_key = resp.json()["storage_key"]
+    return _storage_key
+
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    global _storage_key
+    key = init_storage()
+    resp = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=120)
+    if resp.status_code == 503:
+        _storage_key = None
+        key = init_storage()
+        resp = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=120)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_object(path: str) -> tuple[bytes, str]:
+    key = init_storage()
+    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
 
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_EXPIRE_MINUTES = int(os.environ.get("JWT_EXPIRE_MINUTES", "720"))
@@ -52,6 +96,22 @@ class ApplicantCreate(BaseModel):
     quota: str = "CQ"
     phase: Optional[int] = None
     total_fee: float = 0
+
+
+class ApplicantUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    course: Optional[str] = None
+    academic_year: Optional[str] = None
+    email: Optional[str] = None
+    mobile: Optional[str] = None
+    quota: Optional[str] = None
+    phase: Optional[int] = None
+    total_fee: Optional[float] = None
+
+
+class ImportPayload(BaseModel):
+    csv_text: str = Field(min_length=1)
 
 
 class StageUpdate(BaseModel):
@@ -238,6 +298,10 @@ async def seed_if_empty() -> None:
 
 @app.on_event("startup")
 async def _startup():
+    try:
+        init_storage()
+    except Exception as exc:
+        logger.warning("Storage init failed: %s", exc)
     await seed_users()
     await seed_courses()
     await seed_if_empty()
@@ -417,6 +481,144 @@ async def add_payment(application_no: str, payload: PaymentCreate, _: Annotated[
     if not result:
         raise HTTPException(404, "Applicant not found")
     return clean(result)
+
+
+@api.patch("/applicants/{application_no}")
+async def edit_applicant(application_no: str, payload: ApplicantUpdate, _: Annotated[dict, Depends(require_roles(Role.admin, Role.office))]):
+    changes = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not changes:
+        raise HTTPException(400, "Nothing to update")
+    changes["updated_at"] = datetime.now(timezone.utc).isoformat()
+    result = await db.applicants.find_one_and_update(
+        {"application_no": application_no},
+        {"$set": changes, "$push": {"activity": "Applicant details updated"}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not result:
+        raise HTTPException(404, "Applicant not found")
+    return clean(result)
+
+
+@api.delete("/applicants/{application_no}")
+async def delete_applicant(application_no: str, _: Annotated[dict, Depends(require_roles(Role.admin))]):
+    result = await db.applicants.delete_one({"application_no": application_no})
+    if not result.deleted_count:
+        raise HTTPException(404, "Applicant not found")
+    return {"ok": True}
+
+
+@api.post("/applicants/import")
+async def import_applicants(payload: ImportPayload, _: Annotated[dict, Depends(require_roles(Role.admin))]):
+    reader = csv.DictReader(io.StringIO(payload.csv_text.strip()))
+    if not reader.fieldnames:
+        raise HTTPException(400, "The file is empty or not a valid CSV")
+    norm = {(f or "").strip().lower().replace(" ", "_"): f for f in reader.fieldnames}
+    if "application_no" not in norm or "first_name" not in norm:
+        raise HTTPException(400, "CSV must include at least 'application_no' and 'first_name' columns")
+
+    def g(row, key, default=""):
+        col = norm.get(key)
+        return (row.get(col) or default).strip() if col else default
+
+    created, skipped, errors = 0, 0, []
+    now = datetime.now(timezone.utc).isoformat()
+    for i, row in enumerate(reader, start=2):
+        app_no = g(row, "application_no")
+        first = g(row, "first_name")
+        if not app_no or not first:
+            errors.append(f"Row {i}: missing application_no or first_name")
+            continue
+        if await db.applicants.find_one({"application_no": app_no}):
+            skipped += 1
+            continue
+        try:
+            fee = float(g(row, "total_fee", "0") or 0)
+        except ValueError:
+            fee = 0
+        item = {
+            "application_no": app_no,
+            "first_name": first,
+            "last_name": g(row, "last_name"),
+            "course": g(row, "course"),
+            "academic_year": g(row, "academic_year", "2026-27") or "2026-27",
+            "email": g(row, "email"),
+            "mobile": g(row, "mobile"),
+            "quota": g(row, "quota", "CQ") or "CQ",
+            "phase": None,
+            "total_fee": fee,
+            "stage": "New",
+            "score": 0,
+            "updated_at": now,
+            "documents": {d: False for d in DOCUMENTS},
+            "paid": 0,
+            "activity": ["Imported from spreadsheet"],
+        }
+        await db.applicants.insert_one(item)
+        created += 1
+    return {"created": created, "skipped": skipped, "errors": errors[:20]}
+
+
+@api.post("/applicants/{application_no}/documents/upload")
+async def upload_document(application_no: str, document: Annotated[str, Form()], file: Annotated[UploadFile, File()], user: Annotated[dict, Depends(require_roles(Role.admin, Role.reviewer, Role.lecturer, Role.office))]):
+    if document not in DOCUMENTS:
+        raise HTTPException(400, "Invalid document name")
+    if not EMERGENT_KEY:
+        raise HTTPException(503, "File storage is not configured")
+    applicant = await db.applicants.find_one({"application_no": application_no}, {"_id": 0, "application_no": 1})
+    if not applicant:
+        raise HTTPException(404, "Applicant not found")
+    data = await file.read()
+    if len(data) > 15 * 1024 * 1024:
+        raise HTTPException(400, "File is too large (max 15 MB)")
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "bin"
+    path = f"{APP_NAME}/uploads/{application_no}/{uuid.uuid4().hex}.{ext}"
+    content_type = file.content_type or "application/octet-stream"
+    try:
+        await run_in_threadpool(put_object, path, data, content_type)
+    except requests.HTTPError as exc:
+        code = exc.response.status_code if exc.response is not None else 500
+        if code == 402:
+            raise HTTPException(402, "Storage quota exceeded. Please add credits to upload files.")
+        raise HTTPException(502, "Could not store the file. Please try again.")
+    file_ref = {"path": path, "name": file.filename or f"{document}.{ext}", "content_type": content_type, "uploaded_at": datetime.now(timezone.utc).isoformat()}
+    result = await db.applicants.find_one_and_update(
+        {"application_no": application_no},
+        {"$set": {f"documents.{document}": True, f"document_files.{document}": file_ref, "updated_at": file_ref["uploaded_at"]},
+         "$push": {"activity": f"{document} uploaded ({file_ref['name']})"}},
+        return_document=ReturnDocument.AFTER,
+    )
+    return clean(result)
+
+
+async def _user_from_raw_token(token: str) -> dict:
+    from bson import ObjectId
+
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        doc = await db.users.find_one({"_id": ObjectId(payload.get("sub", ""))})
+    except (jwt.InvalidTokenError, ValueError):
+        raise HTTPException(401, "Could not validate credentials")
+    if not doc or doc.get("disabled"):
+        raise HTTPException(401, "Could not validate credentials")
+    return doc
+
+
+@api.get("/files/{application_no}/{document}")
+async def download_document(application_no: str, document: str, token: str = Query(default=""), authorization: str = Header(default="")):
+    # Accept token via query (web <img>/download) or Authorization header (native).
+    raw = token or (authorization[7:] if authorization.lower().startswith("bearer ") else "")
+    if not raw:
+        raise HTTPException(401, "Missing token")
+    await _user_from_raw_token(raw)
+    applicant = await db.applicants.find_one({"application_no": application_no}, {"_id": 0, "document_files": 1})
+    ref = (applicant or {}).get("document_files", {}).get(document)
+    if not ref:
+        raise HTTPException(404, "No file for this document")
+    try:
+        content, ctype = await run_in_threadpool(get_object, ref["path"])
+    except requests.HTTPError:
+        raise HTTPException(404, "File not found in storage")
+    return Response(content=content, media_type=ctype, headers={"Content-Disposition": f'inline; filename="{ref.get("name", document)}"'})
 
 
 # ------------------------------------------------------------------ reports

@@ -1,0 +1,37 @@
+{
+  "summary": "Live mobile smoke testing covered app load, overview, queue search, applicant detail, and update request flows. Dashboard/search/stage/document/payment/duplicate APIs were reachable, but creating a new applicant returns HTTP 500 after insertion.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/applicants", "issue": "Returns 500 after inserting a valid applicant because the response contains MongoDB ObjectId; server log shows FastAPI jsonable_encoder failure.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/applicants/{application_no}/payments", "issue": "No visible server-side cap prevents paid amount exceeding total_fee."},
+      {"endpoint": "PATCH /api/applicants/{application_no}/documents", "issue": "Document name is not validated against the checklist and can create arbitrary document keys."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "New application", "issue": "Valid create flow reports failure/does not complete because POST endpoint serializes ObjectId as 500.", "affected_testIDs": ["new-applicant-button", "save-applicant-button"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_1.json"],
+  "action_items": [
+    "Return the inserted applicant without MongoDB _id (or call clean(item) after insert) so POST /api/applicants returns 201/200 JSON.",
+    "Add payment bounds and document-name validation if those constraints are required by the admissions workflow.",
+    "Retest new application creation and queue persistence after the POST serialization fix."
+  ],
+  "critical_code_review_comments": [
+    "POST create_applicant inserts item then returns it directly, unlike update endpoints that call clean(), causing the confirmed ObjectId serialization crash.",
+    "Frontend stage/document update handlers silently ignore non-2xx responses and provide no loading or error feedback."
+  ],
+  "updated_files": ["/app/test_reports/iteration_1.json"],
+  "success_rate": {"backend": "85%", "frontend": "75%"},
+  "seed_data_creation": "A test applicant insertion was attempted by the UI; the database insert likely succeeded despite the 500 response. Existing seeded data was also mutated during stage/document smoke checks.",
+  "retest_needed": true,
+  "should_call_test_agent_after_fix": true,
+  "context_for_next_testing_agent": "Preview URL: https://mvp-to-app-2.preview.emergentagent.com. No auth is implemented. App loaded at 390x844. POST create failure is reproducible and logged in /var/log/supervisor/backend.err.log. One detail-stage tap was blocked by the horizontal stage control being outside viewport in Playwright; use locator.scroll_into_view_if_needed() before tapping.",
+  "rca_of_issue": "POST /api/applicants validates and inserts the payload, then returns the raw PyMongo insert document containing _id. FastAPI cannot encode ObjectId and emits 500. Mitigation: return clean(item), or explicitly exclude _id in the response. Verify duplicate protection still returns 409 and confirm created record appears in GET /api/applicants."
+}

@@ -1,0 +1,73 @@
+{
+  "project": "Admissions Management",
+  "context": "Hybrid fullstack admissions operations app",
+  "theme": "Warm Swiss utility: light-first, with optional deep ink mode",
+  "audience": ["Admissions officers", "Reviewers", "Program administrators"],
+  "success_actions": ["Find an application quickly", "Understand review status and missing documents", "Move an applicant to the next stage", "Create an applicant or assign a follow-up"],
+  "emotional_tone": "Calm authority, human attention, operational confidence",
+  "design_concepts": [
+    {"name": "The Registrar Desk", "probability": 0.31, "fusion": ["Swiss editorial grid", "archival paper ledger", "airport wayfinding"], "direction": "Warm bone surfaces, ink typography, red used only for urgent actions; dense but generous dashboard hierarchy."},
+    {"name": "Field Notes", "probability": 0.24, "fusion": ["Research notebook", "botanical indexing", "modern operations UI"], "direction": "Sage and clay accents, evidence-led applicant profiles, document checklist as a visual field log."},
+    {"name": "Decision Room", "probability": 0.20, "fusion": ["Courtroom docket", "newspaper information design", "quiet luxury"], "direction": "Ink navy, wine, and parchment; review stages feel deliberate and consequential without feeling intimidating."},
+    {"name": "Signal / Queue", "probability": 0.15, "fusion": ["Railway signage", "command center", "neo-brutalist cards"], "direction": "Off-white base with signal red and warning yellow only for state; status and next action are instantly scannable."},
+    {"name": "Soft Proof", "probability": 0.10, "fusion": ["Library card catalog", "pastel stationery", "mobile productivity app"], "direction": "Pale butter, mint, and peach with hard ink rules; approachable for new reviewers while retaining credibility."}
+  ],
+  "typography": {
+    "headings": "Work Sans, 700/850; use tight tracking and sentence-case headings",
+    "body": "IBM Plex Sans, 400/500; relaxed line height",
+    "data_and_labels": "IBM Plex Mono, 500; uppercase labels with tracking-[0.18em]",
+    "rules": ["Do not use Inter, Roboto, Open Sans, Lato, or Space Grotesk for headings", "H1 maximum text-6xl; H2 maximum text-4xl", "Keep labels tiny but never below 12px equivalent", "Left-align operational content; reserve centered alignment for empty states"]
+  },
+  "colors": {
+    "archetype": "Swiss & high-contrast with warm paper tint",
+    "ink": "#18212B",
+    "paper": "#F7F5EF",
+    "surface": "#FFFDF8",
+    "line": "#D9D6CE",
+    "muted": "#5F6870",
+    "signal_red": "#C83B32",
+    "moss": "#48634E",
+    "ochre": "#B77A24",
+    "navy": "#24364B",
+    "rules": ["Never use pure black or #808080", "Use red only for urgent/negative states and primary CTA", "Meet 4.5:1 for normal text and 3:1 for large text/actions", "No full-screen gradients; use solid tinted surfaces and grain"]
+  },
+  "layouts": {
+    "app_shell": "Desktop: fixed left rail 248px, content column, optional right context drawer. Mobile: top bar plus bottom tab bar.",
+    "dashboard": "High-density 1/3/4-column grid: KPI spans 1, funnel/chart spans 2, alerts/feed spans 1 row-span-2. Use direct grid children and h-full.",
+    "applications": "List + detail split view. Filters stay above the list; selected applicant opens a detail panel without losing queue position.",
+    "profile": "Applicant identity and next action at top; timeline and review rubric in the main column; documents and alerts in a narrow side column.",
+    "spacing": "Use 2-3x normal spacing: section padding 24-48px, panel padding 24px, grid gaps 16-24px. Never let bordered content touch its edge."
+  },
+  "grids": {
+    "mode": "High Density Grid for operations",
+    "base": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4",
+    "dashboard_ratios": ["summary col-span-1", "primary chart col-span-2 row-span-2", "alerts col-span-1 row-span-2"],
+    "application_queue": "Use a 12-column desktop composition: applicant identity 4, program 2, stage 2, score 1, deadline 2, action 1.",
+    "visual_rule": "Expose the skeleton with 1px tinted rules; avoid equal-square bento repetition."
+  },
+  "component_name": {
+    "navigation": "AdmissionsRail / MobileHeader",
+    "metrics": "MetricStrip",
+    "queue": "ApplicationQueue",
+    "profile": "ApplicantProfile",
+    "documents": "DocumentChecklist",
+    "workflow": "ReviewStageStepper",
+    "alerts": "AlertFeed",
+    "actions": "QuickActionBar",
+    "filters": "ApplicationFilterBar"
+  },
+  "component_path": "Use existing frontend/app and shared components; for JavaScript implementation use .js files and React Native StyleSheet conventions. If a web shell is added, keep reusable UI in frontend/src/components/.",
+  "motion": {
+    "entrance": "Stagger queue rows by 35ms with opacity and translateY",
+    "interaction": "Use 160-220ms transitions for button opacity, backgroundColor, borderColor and transform only where intentional",
+    "workflow": "Stage changes animate the active rule and announce status text; do not rely on color alone",
+    "loading": "Use skeleton rows and a subtle progress shimmer, not spinners everywhere",
+    "reduced_motion": "Disable stagger, shimmer, parallax, and decorative motion when prefers-reduced-motion is enabled"
+  },
+  "visual_enhancers": ["Subtle paper grain overlay at 3-5% opacity", "1px ruled dividers", "Small mono overlines", "Layered ambient and direct shadows", "Custom scrollbar with tinted thumb", "Hard-edged active indicator on navigation", "Use glass only for sticky header with opaque white/70 plus blur and inner border"],
+  "media": {"needed": false, "image_urls": [], "instruction": "This is an operations app; prioritize applicant document thumbnails only when real data exists. Do not use placeholder image URLs or decorative stock photography."},
+  "3d libraries": {"selected": false, "reason": "Clarity and scanability matter more than immersion for admissions operations.", "steps": []},
+  "accessibility": ["Every button, link, input, menu, tab, metric, alert, applicant row, and confirmation must include data-testid in kebab-case", "Provide visible focus states with 2px high-contrast outline", "Use accessible labels and announcements for stage/status changes", "Status chips require text plus icon or shape, never color alone", "Maintain minimum 44px touch targets", "Do not use complete transparent backgrounds behind readable content", "Ensure charts have labels, a table/list alternative, and color-blind-safe hues"],
+  "general_ui_ux_design_guidelines": ["Avoid generic centered layouts and uniform cards", "Use asymmetric hierarchy and intentional negative space", "Prefer flat rectangular surfaces with subtle borders; radius max 8px for dashboard panels", "Primary color is reserved for primary CTA and active workflow state", "Never use transition: all", "Never use AI assistant emoji characters as icons", "Use lucide or existing icon library, with aria-hidden on decorative icons", "Use Sonner for toast feedback if web components are introduced", "All key informational elements must have stable data-testid attributes", "Validate all real API flows; clearly mark any mocked data or mocked integration in the UI"],
+  "implementation_notes_for_main_agent": ["The supplied repository is Expo/React Native with .tsx entry files, while the requested handoff convention references .js. Preserve the repository's working file format unless converting is intentional; apply these rules equally to JavaScript components.", "Replace the placeholder image screen with the admissions shell and functional local state first.", "Connect dashboard metrics, recent applications, alerts, search/filter, checklist updates, review-stage changes, and quick actions to FastAPI endpoints.", "Keep backend data models explicit for applicants, applications, documents, review events, alerts, and metrics.", "Do not claim persistence works until the API and database path are verified; mark unconnected flows as MOCKED."]
+}

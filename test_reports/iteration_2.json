@@ -1,0 +1,20 @@
+{
+  "summary": "Validated live Expo dashboard, queue search, stage filtering, applicant detail opening, and backend regressions. Backend checks passed; the mobile detail stage control could not be tapped because the horizontal stage row places the selected pill outside the viewport.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [{"component": "ApplicantDetail stage row", "issue": "On 390x844, stage-admitted is rendered outside the viewport and Playwright cannot tap it after detail opens; horizontal stage controls need reliable auto-scroll or a layout that keeps actions tappable.", "testID": "stage-admitted", "priority": "HIGH"}],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_admissions_iteration2.py", "/app/test_reports/pytest/iteration2.xml"],
+  "action_items": ["Fix ApplicantDetail horizontal stage control behavior so every stage remains tappable at 390px width; then retest stage and document persistence plus UI creation flow."],
+  "critical_code_review_comments": ["Frontend API base uses EXPO_PUBLIC_BACKEND_URL rather than the requested EXPO_BACKEND_URL key; confirm this is intentional and consistently configured.", "Filter testIDs preserve stage capitalization (filter-Documents), unlike the kebab-case accessibility guideline."],
+  "updated_files": ["/app/backend/tests/test_admissions_iteration2.py", "/app/test_reports/iteration_2.json"],
+  "success_rate": {"backend": "100%", "frontend": "60%"},
+  "seed_data_creation": "Created TEST applicant APP-ITER2-API via regression test; it is retained in the shared database.",
+  "retest_needed": true,
+  "should_call_test_agent_after_fix": true,
+  "context_for_next_testing_agent": "Overview loaded at 390x844 with no horizontal body overflow. Applications search worked (Aarav returned one row). Documents filter works using [data-testid=filter-Documents]. Detail opens. Stage action is outside viewport; do not repeat selector retries without fixing layout/scroll behavior.",
+  "rca_of_issue": "ApplicantDetail places four stage pills in a horizontal ScrollView. At mobile width, the final pill is beyond the visible area and the web renderer's automatic scroll does not produce a tappable viewport position. The same interaction risk applies to later stage/document workflow verification."
+}

@@ -1,0 +1,20 @@
+{
+  "summary": "Iteration 3 regression verified the public Expo preview at 390x844 and backend admissions APIs. Overview, queue search/filter, all applicant stage controls, document interaction, new application creation, persistence, invalid document rejection, payment overage rejection, and ObjectId-safe responses passed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_admissions_iteration2.py", "/app/test_reports/pytest/iteration3.xml"],
+  "action_items": ["Align frontend/.env and source code with the required EXPO_BACKEND_URL key, or document the intentional EXPO_PUBLIC_BACKEND_URL convention.", "Normalize filter testIDs to kebab-case (for example filter-documents) to match the accessibility guideline and avoid selector ambiguity."],
+  "critical_code_review_comments": ["index.tsx builds API from EXPO_PUBLIC_BACKEND_URL while the environment contract specifies EXPO_BACKEND_URL; the current preview works only because EXPO_PUBLIC_BACKEND_URL is configured.", "The first pytest invocation failed because the regression test assumes EXPO_BACKEND_URL is exported in the shell; rerun with the configured frontend value passed explicitly succeeded."],
+  "updated_files": ["/app/test_reports/iteration_3.json", "/app/test_reports/pytest/iteration3.xml"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "UI test created APP-ITER3-UI; prior shared iteration records remain in the database.",
+  "retest_needed": false,
+  "should_call_test_agent_after_fix": false,
+  "context_for_next_testing_agent": "Public preview https://mvp-to-app-2.preview.emergentagent.com. Stage controls are wrapped and all four are reachable at 390x844. Use filter-all (not filter-All stages); stage-specific IDs currently preserve capitalization.",
+  "rca_of_issue": "The prior mobile stage visibility issue is resolved by the wrapped stageRow layout. The only observed regression-test failure was harness configuration: EXPO_BACKEND_URL was absent from the shell, not an API failure."
+}

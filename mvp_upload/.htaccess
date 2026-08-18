@@ -1,0 +1,3 @@
+Options -Indexes
+# Recommended: configure Apache DocumentRoot to /public.
+# If the project root is exposed, do not expose config/, app/ or database/ directly.
